@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d1f3c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Acadia Log">
+  <title>Acadia Boat Log</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #0a1628; --navy2: #0d1f3c;
+      --gold: #c9943a; --gold2: #e8b04a;
+      --sea2: #2980a0;
+      --teal: #05d57a; --sky: #97bcc7; --cream: #f2f1ef;
+      --deep: #006884; --stone: #adaa9b;
+      --text: #f0ece0; --text2: #b8c4d0;
+      --card: rgba(255,255,255,0.06); --border: rgba(201,148,58,0.25);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; }
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    header { background: var(--navy2); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 10; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-text { font-size: 18px; font-weight: 500; color: var(--gold2); }
+    .logo-sub { font-size: 11px; color: var(--stone); letter-spacing: 1px; text-transform: uppercase; }
+    .sync-status { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stone); flex-shrink: 0; }
+    .sync-dot.connected { background: var(--teal); }
+    .sync-dot.syncing { background: var(--gold2); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .sync-label { color: var(--stone); }
+
+    nav { background: var(--navy2); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; position: sticky; top: 56px; z-index: 9; }
+    nav::-webkit-scrollbar { display: none; }
+    nav button { padding: 0 18px; height: 44px; font-size: 13px; background: none; border: none; color: var(--sky); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: all .2s; -webkit-tap-highlight-color: transparent; }
+    nav button.active { color: var(--cream); border-bottom-color: var(--teal); }
+    nav button:hover:not(.active) { color: var(--cream); }
+
+    .content { flex: 1; padding: 16px; max-width: 900px; width: 100%; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .page-title { font-size: 16px; font-weight: 500; color: var(--gold2); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+
+    .signin-banner { background: rgba(0,104,132,0.15); border: 0.5px solid rgba(0,104,132,0.4); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; }
+    .signin-banner h3 { color: var(--cream); font-size: 15px; margin-bottom: 6px; }
+    .signin-banner p { color: var(--stone); font-size: 13px; margin-bottom: 16px; }
+    .btn-google { display: inline-flex; align-items: center; gap: 10px; background: white; color: #333; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .btn-signout { background: none; border: 0.5px solid var(--border); color: var(--stone); border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+    .btn-sync { background: rgba(5,213,122,0.15); border: 0.5px solid rgba(5,213,122,0.35); color: var(--teal); border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+
+    .form-section-label { font-size: 11px; font-weight: 500; color: var(--stone); text-transform: uppercase; letter-spacing: 0.8px; margin: 20px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .form-section-label::after { content:''; flex:1; height:0.5px; background: var(--border); }
+    .location-block { background: rgba(255,255,255,0.04); border: 0.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+    .location-block-title { font-size: 11px; color: var(--sky); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 10px; }
+    .three-col { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; color: var(--stone); text-transform: uppercase; letter-spacing: 0.6px; }
+    input, select { background: rgba(255,255,255,0.07); border: 0.5px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 9px 12px; font-size: 16px; color: var(--cream); font-family: inherit; width: 100%; outline: none; transition: border-color .2s; -webkit-appearance: none; }
+    input:focus, select:focus { border-color: var(--teal); }
+    select option { background: var(--navy2); color: var(--cream); }
+    .btn-primary { background: var(--deep); color: var(--cream); border: none; border-radius: 8px; padding: 13px 24px; font-size: 15px; font-weight: 500; cursor: pointer; width: 100%; margin-top: 16px; }
+    .btn-primary:disabled { opacity: 0.5; }
+    .success-msg { background: rgba(5,213,122,0.15); border: 0.5px solid rgba(5,213,122,0.4); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--teal); margin-top: 10px; display: none; }
+    .error-msg { background: rgba(180,60,60,0.15); border: 0.5px solid rgba(180,60,60,0.4); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #e07070; margin-top: 10px; display: none; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .stat-card { background: var(--card); border: 0.5px solid var(--border); border-radius: 10px; padding: 14px 12px; }
+    .stat-label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .stat-value { font-size: 22px; font-weight: 500; color: var(--gold2); }
+    .stat-sub { font-size: 11px; color: var(--stone); margin-top: 3px; }
+    .section-label { font-size: 12px; font-weight: 500; color: var(--stone); text-transform: uppercase; letter-spacing: 0.8px; margin: 20px 0 10px; }
+    .anchor-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 14px; }
+    .anchor-line { flex: 1; height: 0.5px; background: var(--border); }
+    .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .bk-card { background: var(--card); border: 0.5px solid var(--border); border-radius: 10px; padding: 14px; }
+    .bk-title { font-size: 12px; color: var(--stone); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+    .bk-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .bk-count { font-size: 14px; font-weight: 500; color: var(--gold2); }
+    .chart-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+    .chart-month { font-size: 11px; color: var(--stone); width: 72px; flex-shrink: 0; }
+    .chart-bar-wrap { flex: 1; display: flex; gap: 2px; }
+    .chart-bar { height: 14px; border-radius: 3px; min-width: 2px; }
+    .cb-sail { background: var(--deep); }
+    .cb-motor { background: rgba(139,105,20,0.6); }
+    .chart-nm { font-size: 11px; color: var(--stone); width: 50px; text-align: right; flex-shrink: 0; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .bar-label { font-size: 12px; color: var(--text2); width: 40px; text-align: right; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; background: var(--deep); }
+    .bar-fill.gold { background: var(--gold); }
+    .bar-val { font-size: 12px; color: var(--stone); width: 32px; text-align: right; flex-shrink: 0; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+    .badge-anchor  { background: rgba(0,104,132,0.35); color: var(--sky); }
+    .badge-mooring { background: rgba(201,148,58,0.25); color: var(--gold2); }
+    .badge-dock    { background: rgba(255,255,255,0.12); color: var(--cream); }
+    .badge-free    { background: rgba(5,213,122,0.18); color: var(--teal); }
+    .badge-boatyard{ background: rgba(180,60,60,0.25); color: #e07070; }
+    .badge-inland  { background: rgba(0,104,132,0.3); color: var(--sky); font-size:10px; }
+    .badge-ocean   { background: rgba(201,148,58,0.25); color: var(--gold2); font-size:10px; }
+
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-end; }
+    .filter-bar .form-group { flex: 1; min-width: 120px; }
+    .filter-bar label { font-size: 11px; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; font-size: 13px; }
+    .filter-clear { background: none; border: 0.5px solid var(--border); color: var(--stone); border-radius: 8px; padding: 7px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; align-self: flex-end; }
+    .result-count { font-size: 12px; color: var(--stone); margin-bottom: 10px; }
+
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+    th { text-align: left; padding: 8px 10px; font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 1px solid var(--border); font-weight: 400; }
+    td { padding: 8px 10px; border-bottom: 0.5px solid rgba(255,255,255,0.05); color: var(--text2); vertical-align: middle; }
+    .row-actions { display: flex; gap: 6px; }
+    .btn-edit { background: rgba(0,104,132,0.3); color: var(--sky); border: 0.5px solid rgba(151,188,199,0.3); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+    .btn-del  { background: rgba(180,60,60,0.2); color: #e07070; border: 0.5px solid rgba(180,60,60,0.3); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+    .empty { text-align: center; padding: 40px 20px; color: var(--stone); font-size: 13px; }
+
+    .modal-bg { position:fixed; inset:0; background: rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
+    .modal { background: var(--navy2); border: 0.5px solid var(--border); border-radius: 14px; padding: 20px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+    .modal-title { font-size: 15px; font-weight: 500; color: var(--gold2); margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-save   { flex:1; background: var(--deep); color: var(--cream); border: none; border-radius: 8px; padding: 10px; font-size: 14px; cursor: pointer; }
+    .btn-cancel { flex:1; background: none; color: var(--stone); border: 0.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 14px; cursor: pointer; }
+
+    #map-svg-wrap { width:100%; overflow:hidden; border-radius:10px; border:0.5px solid var(--border); background:#071525; }
+    .map-legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--stone); }
+    .map-legend span { display:flex; align-items:center; gap:5px; }
+    .map-legend i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .route-info { background:var(--card); border:0.5px solid var(--border); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--text2); margin-top:10px; }
+
+    @media (max-width:500px) {
+      .three-col, .form-grid, .breakdown-grid { grid-template-columns:1fr; }
+      .filter-bar { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <path d="M16 4L16 28" stroke="#c9943a" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M16 6L28 16L16 22Z" fill="rgba(201,148,58,0.3)" stroke="#c9943a" stroke-width="1"/>
+        <path d="M4 26Q10 22 16 24Q22 22 28 26" stroke="#2980a0" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="logo-text">Acadia</div>
+        <div class="logo-sub">Boat Log</div>
+      </div>
+    </div>
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span class="sync-label" id="sync-label">Not signed in</span>
+    </div>
+  </header>
+
+  <nav>
+    <button class="active" onclick="showSection('dashboard',this)">Dashboard</button>
+    <button onclick="showSection('log',this)">Log Entry</button>
+    <button onclick="showSection('entries',this)">Log Book</button>
+    <button onclick="showSection('map',this)">Route Map</button>
+    <button onclick="showSection('stats',this)">Stats</button>
+  </nav>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="sec-dashboard" class="section active">
+      <div class="page-title">
+        <span>Voyage Overview</span>
+        <div style="display:flex;gap:8px" id="dash-actions"></div>
+      </div>
+      <div id="signin-banner-dash" class="signin-banner">
+        <h3>Connect to Google Sheets</h3>
+        <p>Sign in to sync your Acadia log with your Google Sheet.</p>
+        <button class="btn-google" onclick="signIn()">
+          <svg viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+          Sign in with Google
+        </button>
+      </div>
+      <div class="stats-grid" id="dash-stats"></div>
+      <div class="section-label">Monthly miles — sailed vs motored</div>
+      <div id="monthly-chart"></div>
+      <div class="anchor-divider"><div class="anchor-line"></div><span style="color:#c9943a;font-size:14px">⚓</span><div class="anchor-line"></div></div>
+      <div class="breakdown-grid">
+        <div class="bk-card"><div class="bk-title">Anchorage type</div><div id="anchor-breakdown"></div></div>
+        <div class="bk-card"><div class="bk-title">Sea days</div><div id="seaday-breakdown"></div></div>
+      </div>
+      <div class="section-label" style="margin-top:20px">Top states / provinces</div>
+      <div id="state-bars"></div>
+    </div>
+
+    <!-- LOG ENTRY -->
+    <div id="sec-log" class="section">
+      <div class="page-title"><span>New Log Entry</span></div>
+      <div id="signin-banner-log" class="signin-banner" style="display:none">
+        <h3>Sign in to save to Google Sheets</h3>
+        <p>Entries can be saved locally without signing in, but won't sync to your sheet.</p>
+        <button class="btn-google" onclick="signIn()">
+          <svg viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+          Sign in with Google
+        </button>
+      </div>
+      <div class="form-section-label">Date &amp; overnight type</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date</label><input type="date" id="f-date"></div>
+        <div class="form-group"><label>Anchorage / Dockage</label>
+          <select id="f-anchor"><option value="">Select type</option><option>Anchored</option><option>Wyeside</option><option>Mooring</option><option>Paid Dock</option><option>Free Dock</option><option>Boat Yard</option><option>Underway</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Locations</div>
+      <div class="location-block">
+        <div class="location-block-title">Start location</div>
+        <div class="three-col">
+          <div class="form-group"><label>City</label><input type="text" id="f-start-city" placeholder="e.g. Annapolis"></div>
+          <div class="form-group"><label>State</label><input type="text" id="f-start-state" placeholder="MD"></div>
+        </div>
+      </div>
+      <div class="location-block">
+        <div class="location-block-title">End location</div>
+        <div class="three-col">
+          <div class="form-group"><label>City</label><input type="text" id="f-end-city" placeholder="e.g. Portsmouth"></div>
+          <div class="form-group"><label>State</label><input type="text" id="f-end-state" placeholder="VA"></div>
+        </div>
+      </div>
+      <div class="form-section-label">Travel data</div>
+      <div class="form-grid">
+        <div class="form-group"><label>NM traveled</label><input type="number" id="f-nm" placeholder="0.0" step="0.1" min="0" inputmode="decimal"></div>
+        <div class="form-group"><label>Hours traveled</label><input type="number" id="f-hours" placeholder="0.0" step="0.1" min="0" inputmode="decimal"></div>
+        <div class="form-group"><label>NM motored</label><input type="number" id="f-motor" placeholder="0.0" step="0.1" min="0" inputmode="decimal"></div>
+        <div class="form-group"><label>Dockage cost ($)</label><input type="number" id="f-cost" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
+      </div>
+      <div class="form-section-label">USCG classification</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Sea day type</label>
+          <select id="f-seaday"><option value="">Not a sea day</option><option>Inland</option><option>Ocean</option></select>
+        </div>
+        <div class="form-group"><label>Notes</label><input type="text" id="f-notes" placeholder="Optional"></div>
+      </div>
+      <button class="btn-primary" id="log-btn" onclick="saveEntry()">Log This Day</button>
+      <div class="success-msg" id="save-success"></div>
+      <div class="error-msg" id="save-error"></div>
+    </div>
+
+    <!-- LOG BOOK -->
+    <div id="sec-entries" class="section">
+      <div class="page-title"><span>Log Book</span></div>
+      <div class="filter-bar">
+        <div class="form-group"><label>From date</label><input type="date" id="fil-from"></div>
+        <div class="form-group"><label>To date</label><input type="date" id="fil-to"></div>
+        <div class="form-group"><label>Anchorage type</label>
+          <select id="fil-anchor"><option value="">All types</option><option>Anchored</option><option>Wyeside</option><option>Mooring</option><option>Paid Dock</option><option>Free Dock</option><option>Boat Yard</option><option>Underway</option></select>
+        </div>
+        <div class="form-group"><label>Sea day</label>
+          <select id="fil-seaday"><option value="">All</option><option value="none">Not a sea day</option><option>Inland</option><option>Ocean</option></select>
+        </div>
+        <button class="filter-clear" onclick="clearFilters()">Clear</button>
+      </div>
+      <div class="result-count" id="result-count"></div>
+      <div class="table-wrap"><div id="entries-table"></div></div>
+    </div>
+
+    <!-- ROUTE MAP -->
+    <div id="sec-map" class="section">
+      <div class="page-title"><span>Route Map</span></div>
+      <div id="map-svg-wrap"></div>
+      <div class="map-legend">
+        <span><i style="background:#05d57a"></i>Anchored</span>
+        <span><i style="background:#e8b04a"></i>Mooring / Paid Dock</span>
+        <span><i style="background:#97bcc7"></i>Free Dock / Other</span>
+      </div>
+      <div class="route-info" id="route-info"></div>
+    </div>
+
+    <!-- STATS -->
+    <div id="sec-stats" class="section">
+      <div class="page-title"><span>Cruising Statistics</span></div>
+      <div class="section-label">Dockage &amp; mooring costs</div>
+      <div id="cost-stats"></div>
+      <div class="section-label" style="margin-top:20px">Travel by state / province</div>
+      <div id="full-state-bars"></div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" style="display:none" class="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title">Edit Log Entry</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date</label><input type="date" id="e-date"></div>
+      <div class="form-group"><label>Anchorage / Dockage</label>
+        <select id="e-anchor"><option value="">Select type</option><option>Anchored</option><option>Wyeside</option><option>Mooring</option><option>Paid Dock</option><option>Free Dock</option><option>Boat Yard</option><option>Underway</option></select>
+      </div>
+    </div>
+    <div style="margin-top:10px" class="location-block">
+      <div class="location-block-title">Start location</div>
+      <div class="three-col">
+        <div class="form-group"><label>City</label><input type="text" id="e-start-city"></div>
+        <div class="form-group"><label>State</label><input type="text" id="e-start-state"></div>
+      </div>
+    </div>
+    <div class="location-block">
+      <div class="location-block-title">End location</div>
+      <div class="three-col">
+        <div class="form-group"><label>City</label><input type="text" id="e-end-city"></div>
+        <div class="form-group"><label>State</label><input type="text" id="e-end-state"></div>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-top:10px">
+      <div class="form-group"><label>NM traveled</label><input type="number" id="e-nm" step="0.1" min="0" inputmode="decimal"></div>
+      <div class="form-group"><label>Hours traveled</label><input type="number" id="e-hours" step="0.1" min="0" inputmode="decimal"></div>
+      <div class="form-group"><label>NM motored</label><input type="number" id="e-motor" step="0.1" min="0" inputmode="decimal"></div>
+      <div class="form-group"><label>Dockage cost ($)</label><input type="number" id="e-cost" step="0.01" min="0" inputmode="decimal"></div>
+      <div class="form-group"><label>Sea day</label>
+        <select id="e-seaday"><option value="">Not a sea day</option><option>Inland</option><option>Ocean</option></select>
+      </div>
+      <div class="form-group"><label>Notes</label><input type="text" id="e-notes"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const CLIENT_ID = '814932067525-ael3nvh2isgrqe98fn5lm92v8g03mufr.apps.googleusercontent.com';
+const SHEET_ID  = '1qPCzQGEcy6bJsYIzAqeyXsL6SIo6eh_v1voy3xe6hl8';
+const SHEET_TAB = 'Log Entries';
+const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
+
+let accessToken = null;
+let entries = [];
+let editIdx = null;
+let sheetRowMap = [];
+
+function signIn() {
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID, scope: SCOPES,
+    callback: async (resp) => {
+      if(resp.error) { showMsg('save-error', 'Sign in failed: ' + resp.error); return; }
+      accessToken = resp.access_token;
+      updateSyncUI(true);
+      await loadFromSheets();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function signOut() {
+  if(accessToken) google.accounts.oauth2.revoke(accessToken, ()=>{});
+  accessToken = null;
+  updateSyncUI(false);
+}
+
+function updateSyncUI(connected) {
+  document.getElementById('sync-dot').className = 'sync-dot' + (connected ? ' connected' : '');
+  document.getElementById('sync-label').textContent = connected ? 'Synced with Sheets' : 'Not signed in';
+  document.getElementById('signin-banner-dash').style.display = connected ? 'none' : 'block';
+  document.getElementById('signin-banner-log').style.display = connected ? 'none' : 'block';
+  document.getElementById('dash-actions').innerHTML = connected
+    ? `<button class="btn-sync" onclick="loadFromSheets()">↻ Refresh</button><button class="btn-signout" onclick="signOut()">Sign out</button>`
+    : '';
+}
+
+async function sheetsGet(range) {
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`, { headers: { Authorization: `Bearer ${accessToken}` }});
+  if(!r.ok) throw new Error('Read failed: ' + r.status);
+  return r.json();
+}
+async function sheetsAppend(values) {
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_TAB)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    method:'POST', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
+    body: JSON.stringify({values})
+  });
+  if(!r.ok) throw new Error('Append failed: ' + r.status);
+  return r.json();
+}
+async function sheetsUpdate(rowNum, values) {
+  const range = `${SHEET_TAB}!A${rowNum}:L${rowNum}`;
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, {
+    method:'PUT', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
+    body: JSON.stringify({values})
+  });
+  if(!r.ok) throw new Error('Update failed: ' + r.status);
+  return r.json();
+}
+async function sheetsDelete(rowNum) {
+  const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`, { headers:{Authorization:`Bearer ${accessToken}`}});
+  const meta = await metaR.json();
+  const gid = meta.sheets.find(s=>s.properties.title===SHEET_TAB)?.properties.sheetId ?? 0;
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`, {
+    method:'POST', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
+    body: JSON.stringify({requests:[{deleteDimension:{range:{sheetId:gid,dimension:'ROWS',startIndex:rowNum-1,endIndex:rowNum}}}]})
+  });
+  if(!r.ok) throw new Error('Delete failed: ' + r.status);
+}
+
+function rowToEntry(row) {
+  return { date:row[0]||'', startCity:row[1]||'', startState:row[2]||'', endCity:row[3]||'', endState:row[4]||'', anchor:row[5]||'', nm:row[6]||'', hours:row[7]||'', motor:row[8]||'', cost:row[9]||'', seaday:row[10]||'', notes:row[11]||'' };
+}
+function entryToRow(e) {
+  return [[e.date, e.startCity, e.startState, e.endCity, e.endState, e.anchor, e.nm||'', e.hours||'', e.motor||'', e.cost||'', e.seaday||'', e.notes||'']];
+}
+
+async function loadFromSheets() {
+  setSyncStatus('syncing','Loading…');
+  try {
+    const data = await sheetsGet(`${SHEET_TAB}!A:L`);
+    const rows = data.values || [];
+    const start = (rows[0] && isNaN(Date.parse(rows[0][0]))) ? 1 : 0;
+    entries = []; sheetRowMap = [];
+    rows.slice(start).forEach((row,i) => { entries.push(rowToEntry(row)); sheetRowMap.push(start+i+1); });
+    setSyncStatus('connected',`Synced · ${entries.length} entries`);
+    renderDashboard();
+    if(document.getElementById('sec-entries').classList.contains('active')) renderEntries();
+  } catch(err) { setSyncStatus('error','Sync failed'); console.error(err); }
+}
+
+function setSyncStatus(state, label) {
+  document.getElementById('sync-dot').className = 'sync-dot' + (state==='connected'?' connected':state==='syncing'?' syncing':'');
+  document.getElementById('sync-label').textContent = label;
+}
+
+async function saveEntry() {
+  const e = {
+    date: document.getElementById('f-date').value,
+    startCity: document.getElementById('f-start-city').value.trim(),
+    startState: document.getElementById('f-start-state').value.trim().toUpperCase(),
+    endCity: document.getElementById('f-end-city').value.trim(),
+    endState: document.getElementById('f-end-state').value.trim().toUpperCase(),
+    anchor: document.getElementById('f-anchor').value,
+    nm: document.getElementById('f-nm').value,
+    hours: document.getElementById('f-hours').value,
+    motor: document.getElementById('f-motor').value,
+    cost: document.getElementById('f-cost').value,
+    seaday: document.getElementById('f-seaday').value,
+    notes: document.getElementById('f-notes').value,
+  };
+  if(!e.date||!e.nm){alert('Please enter at least a date and NM traveled.');return;}
+  const btn=document.getElementById('log-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    if(accessToken) {
+      await sheetsAppend(entryToRow(e));
+      await loadFromSheets();
+      showMsg('save-success','✓ Entry saved to Google Sheets');
+    } else {
+      entries.push(e); sheetRowMap.push(null);
+      showMsg('save-success','✓ Saved locally (sign in to sync to Sheets)');
+      renderDashboard();
+    }
+    ['f-start-city','f-start-state','f-end-city','f-end-state','f-nm','f-hours','f-motor','f-cost','f-notes'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('f-anchor').value=''; document.getElementById('f-seaday').value='';
+    document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  } catch(err) { showMsg('save-error','Failed to save: '+err.message); }
+  finally { btn.disabled=false; btn.textContent='Log This Day'; }
+}
+
+async function deleteEntry(idx) {
+  if(!confirm('Delete this log entry?')) return;
+  const rowNum=sheetRowMap[idx];
+  try {
+    if(accessToken&&rowNum) { setSyncStatus('syncing','Deleting…'); await sheetsDelete(rowNum); await loadFromSheets(); }
+    else { entries.splice(idx,1); sheetRowMap.splice(idx,1); renderEntries(); }
+  } catch(err) { alert('Delete failed: '+err.message); setSyncStatus('connected','Synced'); }
+}
+
+function openEdit(idx) {
+  editIdx=idx; const e=entries[idx];
+  ['date','anchor','nm','hours','motor','cost','seaday','notes'].forEach(k=>{ const el=document.getElementById('e-'+k); if(el) el.value=e[k]||''; });
+  document.getElementById('e-start-city').value=e.startCity||'';
+  document.getElementById('e-start-state').value=e.startState||'';
+  document.getElementById('e-end-city').value=e.endCity||'';
+  document.getElementById('e-end-state').value=e.endState||'';
+  document.getElementById('edit-modal').style.display='flex';
+}
+function closeModal(){document.getElementById('edit-modal').style.display='none';editIdx=null;}
+async function saveEdit(){
+  if(editIdx===null)return;
+  const e=entries[editIdx];
+  ['date','anchor','nm','hours','motor','cost','seaday','notes'].forEach(k=>{const el=document.getElementById('e-'+k);if(el)e[k]=el.value;});
+  e.startCity=document.getElementById('e-start-city').value.trim();
+  e.startState=document.getElementById('e-start-state').value.trim().toUpperCase();
+  e.endCity=document.getElementById('e-end-city').value.trim();
+  e.endState=document.getElementById('e-end-state').value.trim().toUpperCase();
+  closeModal();
+  const rowNum=sheetRowMap[editIdx];
+  if(accessToken&&rowNum){try{setSyncStatus('syncing','Saving…');await sheetsUpdate(rowNum,entryToRow(e));setSyncStatus('connected',`Synced · ${entries.length} entries`);}catch(err){alert('Update failed: '+err.message);}}
+  renderEntries();
+}
+
+function showMsg(id,msg,dur=4000){const el=document.getElementById(id);el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
+
+function getBadge(t){const m={Anchored:'anchor',Mooring:'mooring','Paid Dock':'mooring','Free Dock':'free','Boat Yard':'boatyard',Wyeside:'free',Underway:'dock'};return `<span class="badge badge-${m[t]||'dock'}">${t||'—'}</span>`;}
+
+function calcStats(){
+  const s={nm:0,hours:0,sailed:0,anchor:{},seaday:{Inland:0,Ocean:0},states:{},costs:{Mooring:[],['Paid Dock']:[]},entries:entries.length};
+  entries.forEach(e=>{
+    s.nm+=+e.nm||0;s.hours+=+e.hours||0;
+    const mot=+e.motor||0,nm=+e.nm||0;s.sailed+=Math.max(0,nm-mot);
+    if(e.anchor)s.anchor[e.anchor]=(s.anchor[e.anchor]||0)+1;
+    if(e.seaday)s.seaday[e.seaday]=(s.seaday[e.seaday]||0)+1;
+    const st=e.endState||e.state;if(st)s.states[st]=(s.states[st]||0)+1;
+    const cost=+e.cost||0;if(cost>0&&(e.anchor==='Mooring'||e.anchor==='Paid Dock'))s.costs[e.anchor].push(cost);
+  });
+  s.pctSail=s.nm>0?Math.round(s.sailed/s.nm*100):0;return s;
+}
+function getMonthlyData(){
+  const months={};
+  entries.forEach(e=>{if(!e.date)return;const m=e.date.slice(0,7);if(!months[m])months[m]={nm:0,sailed:0,motor:0};months[m].nm+=+e.nm||0;months[m].motor+=+e.motor||0;months[m].sailed+=Math.max(0,(+e.nm||0)-(+e.motor||0));});
+  return Object.entries(months).sort((a,b)=>a[0]<b[0]?-1:1).slice(-12);
+}
+
+function renderDashboard(){
+  const s=calcStats();
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Total NM</div><div class="stat-value">${s.nm.toLocaleString('en',{maximumFractionDigits:0})}</div><div class="stat-sub">nautical miles</div></div>
+    <div class="stat-card"><div class="stat-label">Hours</div><div class="stat-value">${s.hours.toLocaleString('en',{maximumFractionDigits:0})}</div><div class="stat-sub">underway</div></div>
+    <div class="stat-card"><div class="stat-label">% Sailing</div><div class="stat-value">${s.pctSail}%</div><div class="stat-sub">${s.sailed.toFixed(0)} NM sailed</div></div>
+    <div class="stat-card"><div class="stat-label">Log Entries</div><div class="stat-value">${s.entries}</div><div class="stat-sub">days logged</div></div>
+    <div class="stat-card"><div class="stat-label">Sea Days</div><div class="stat-value">${(s.seaday.Inland||0)+(s.seaday.Ocean||0)}</div><div class="stat-sub">${s.seaday.Inland||0} inland · ${s.seaday.Ocean||0} ocean</div></div>
+    <div class="stat-card"><div class="stat-label">States</div><div class="stat-value">${Object.keys(s.states).length}</div><div class="stat-sub">regions visited</div></div>`;
+  const monthly=getMonthlyData();const maxNm=Math.max(...monthly.map(([,v])=>v.nm),1);
+  document.getElementById('monthly-chart').innerHTML=monthly.map(([m,v])=>{
+    const sW=Math.round(v.sailed/maxNm*240),mW=Math.round(v.motor/maxNm*240);
+    const lbl=new Date(m+'-01').toLocaleDateString('en',{month:'short',year:'2-digit'});
+    return `<div class="chart-row"><div class="chart-month">${lbl}</div><div class="chart-bar-wrap"><div class="chart-bar cb-sail" style="width:${sW}px"></div><div class="chart-bar cb-motor" style="width:${mW}px"></div></div><div class="chart-nm">${v.nm.toFixed(0)}</div></div>`;
+  }).join('')+`<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--stone)"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--deep);display:inline-block"></span>Sailed</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:rgba(139,105,20,0.6);display:inline-block"></span>Motored</span></div>`;
+  const anchorOrder=['Anchored','Wyeside','Mooring','Paid Dock','Free Dock','Boat Yard','Underway'];
+  document.getElementById('anchor-breakdown').innerHTML=anchorOrder.filter(a=>s.anchor[a]).map(a=>`<div class="bk-item"><div>${getBadge(a)}</div><div class="bk-count">${s.anchor[a]}</div></div>`).join('')||'<div class="empty">Sign in to load your data</div>';
+  document.getElementById('seaday-breakdown').innerHTML=`<div class="bk-item"><div><span class="badge badge-inland">Inland</span></div><div class="bk-count">${s.seaday.Inland||0}</div></div><div class="bk-item"><div><span class="badge badge-ocean">Ocean</span></div><div class="bk-count">${s.seaday.Ocean||0}</div></div>`;
+  const topStates=Object.entries(s.states).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxD=topStates[0]?.[1]||1;
+  document.getElementById('state-bars').innerHTML=topStates.map(([st,d])=>`<div class="bar-row"><div class="bar-label">${st}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(d/maxD*100)}%"></div></div><div class="bar-val">${d}d</div></div>`).join('');
+}
+
+function getFiltered(){
+  const from=document.getElementById('fil-from').value,to=document.getElementById('fil-to').value,anc=document.getElementById('fil-anchor').value,sd=document.getElementById('fil-seaday').value;
+  return entries.map((e,i)=>({e,i})).filter(({e})=>{
+    if(from&&e.date<from)return false;if(to&&e.date>to)return false;
+    if(anc&&e.anchor!==anc)return false;if(sd==='none'&&e.seaday)return false;
+    if(sd&&sd!=='none'&&e.seaday!==sd)return false;return true;
+  });
+}
+function renderEntries(){
+  const filtered=getFiltered().sort((a,b)=>b.e.date<a.e.date?-1:1);
+  document.getElementById('result-count').textContent=`Showing ${filtered.length} of ${entries.length} entries`;
+  if(!filtered.length){document.getElementById('entries-table').innerHTML='<div class="empty">No entries match the current filters.</div>';return;}
+  document.getElementById('entries-table').innerHTML=`<table><thead><tr><th>Date</th><th>From</th><th>To</th><th>NM</th><th>Hrs</th><th>Mtr%</th><th>Type</th><th>Cost</th><th>Sea Day</th><th></th></tr></thead><tbody>${filtered.map(({e,i})=>{
+    const mot=+e.motor||0,nm=+e.nm||0,pct=nm>0?Math.round(mot/nm*100):0,cost=+e.cost;
+    return `<tr><td>${e.date}</td><td style="font-size:12px">${e.startCity?`${e.startCity}, ${e.startState}`:'—'}</td><td style="font-size:12px">${e.endCity?`${e.endCity}, ${e.endState}`:'—'}</td><td>${(+e.nm||0).toFixed(1)}</td><td>${(+e.hours||0).toFixed(1)}</td><td>${pct}%</td><td>${getBadge(e.anchor)}</td><td>${cost>0?'$'+cost.toFixed(2):'—'}</td><td>${e.seaday?`<span class="badge badge-${e.seaday.toLowerCase()}">${e.seaday}</span>`:'—'}</td><td><div class="row-actions"><button class="btn-edit" onclick="openEdit(${i})">Edit</button><button class="btn-del" onclick="deleteEntry(${i})">Del</button></div></td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+function clearFilters(){['fil-from','fil-to'].forEach(id=>document.getElementById(id).value='');['fil-anchor','fil-seaday'].forEach(id=>document.getElementById(id).value='');renderEntries();}
+
+const COORDS={MD:{lat:38.9,lng:-76.5},VA:{lat:36.8,lng:-76.3},NC:{lat:34.7,lng:-76.7},SC:{lat:32.7,lng:-79.9},GA:{lat:31.1,lng:-81.5},FL:{lat:27.5,lng:-80.4},MA:{lat:42.6,lng:-70.7},BM:{lat:32.3,lng:-64.8},EX:{lat:24.8,lng:-76.0}};
+function lngToX(lng,w){return Math.round((lng-(-85))/((-60)-(-85))*w);}
+function latToY(lat,h){return Math.round((lat-45)/((22)-45)*h);}
+function renderMap(){
+  const w=640,h=420,sorted=[...entries].sort((a,b)=>a.date<b.date?-1:1),stops=[];
+  sorted.forEach(e=>{const sc=COORDS[e.startState],ec=COORDS[e.endState];if(sc&&stops.length===0)stops.push({...sc,label:`${e.startCity},${e.startState}`,anchor:e.anchor});if(ec)stops.push({...ec,label:`${e.endCity},${e.endState}`,anchor:e.anchor});});
+  let lines='',dots='',labels='';
+  for(let i=1;i<stops.length;i++){const a=stops[i-1],b=stops[i];lines+=`<line x1="${lngToX(a.lng,w)}" y1="${latToY(a.lat,h)}" x2="${lngToX(b.lng,w)}" y2="${latToY(b.lat,h)}" stroke="rgba(242,241,239,0.25)" stroke-width="1.5" stroke-dasharray="4 3"/>`;}
+  const seen=new Set();
+  stops.forEach((s,i)=>{const key=`${s.lat},${s.lng}`;if(seen.has(key))return;seen.add(key);const x=lngToX(s.lng,w),y=latToY(s.lat,h);let col='#97bcc7';if(['Anchored','Wyeside'].includes(s.anchor))col='#05d57a';else if(['Mooring','Paid Dock'].includes(s.anchor))col='#e8b04a';dots+=`<circle cx="${x}" cy="${y}" r="${i===0||i===stops.length-1?6:4}" fill="${col}" stroke="#0a1628" stroke-width="1.5" opacity="0.9"/>`;if(i===0||i===stops.length-1)labels+=`<text x="${x+8}" y="${y-6}" font-size="10" fill="#f2f1ef" font-family="sans-serif">${s.label.split(',')[0]}</text>`;});
+  document.getElementById('map-svg-wrap').innerHTML=`<svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block"><rect width="${w}" height="${h}" fill="#071525" rx="10"/><text x="50" y="380" font-size="10" fill="rgba(151,188,199,0.3)" font-family="sans-serif">East Coast US · Bahamas · Bermuda</text>${lines}${dots}${labels}</svg>`;
+  document.getElementById('route-info').innerHTML=`<strong style="color:var(--cream)">${stops.length} stops plotted</strong> across ${entries.length} log entries — <span style="color:var(--teal)">${entries.reduce((s,e)=>s+(+e.nm||0),0).toLocaleString('en',{maximumFractionDigits:0})} NM total</span>.`;
+}
+
+function renderStats(){
+  const s=calcStats(),moorData=s.costs['Mooring'],dockData=s.costs['Paid Dock'];
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0,mn=a=>a.length?Math.min(...a):0,mx=a=>a.length?Math.max(...a):0,tot=a=>a.reduce((x,y)=>x+y,0);
+  document.getElementById('cost-stats').innerHTML=`<table><thead><tr><th>Type</th><th>Total</th><th>Min</th><th>Max</th><th>Avg</th><th>Count</th></tr></thead><tbody><tr><td>${getBadge('Mooring')}</td><td>$${tot(moorData).toFixed(2)}</td><td>$${mn(moorData).toFixed(2)}</td><td>$${mx(moorData).toFixed(2)}</td><td>$${avg(moorData).toFixed(2)}</td><td>${moorData.length}</td></tr><tr><td>${getBadge('Paid Dock')}</td><td>$${tot(dockData).toFixed(2)}</td><td>$${mn(dockData).toFixed(2)}</td><td>$${mx(dockData).toFixed(2)}</td><td>$${avg(dockData).toFixed(2)}</td><td>${dockData.length}</td></tr></tbody></table>`;
+  const allStates=Object.entries(s.states).sort((a,b)=>b[1]-a[1]);const maxD=allStates[0]?.[1]||1;
+  document.getElementById('full-state-bars').innerHTML=allStates.map(([st,d])=>`<div class="bar-row"><div class="bar-label">${st}</div><div class="bar-track"><div class="bar-fill gold" style="width:${Math.round(d/maxD*100)}%"></div></div><div class="bar-val">${d}d</div></div>`).join('');
+}
+
+function showSection(id,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(id==='dashboard')renderDashboard();
+  if(id==='entries')renderEntries();
+  if(id==='map')renderMap();
+  if(id==='stats')renderStats();
+}
+
+['fil-from','fil-to','fil-anchor','fil-seaday'].forEach(id=>{document.getElementById(id).addEventListener('change',()=>{if(document.getElementById('sec-entries').classList.contains('active'))renderEntries();});});
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+updateSyncUI(false);
+renderDashboard();
+</script>
+</body>
+</html>
