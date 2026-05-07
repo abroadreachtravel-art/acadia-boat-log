@@ -404,8 +404,26 @@ async function sheetsDelete(rowNum) {
   if(!r.ok) throw new Error('Delete failed: ' + r.status);
 }
 
+// Normalize any date format to YYYY-MM-DD
+function normalizeDate(raw) {
+  if(!raw) return '';
+  raw = raw.trim();
+  // Already YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  // MM/DD/YYYY or M/D/YYYY
+  const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(mdy) return `${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
+  // DD/MM/YYYY fallback
+  const dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
+  // Let JS parse as last resort
+  const d = new Date(raw);
+  if(!isNaN(d)) return d.toISOString().slice(0,10);
+  return raw;
+}
+
 function rowToEntry(row) {
-  return { date:row[0]||'', startCity:row[1]||'', startState:row[2]||'', endCity:row[3]||'', endState:row[4]||'', anchor:row[5]||'', nm:row[6]||'', hours:row[7]||'', motor:row[8]||'', cost:row[9]||'', seaday:row[10]||'', notes:row[11]||'' };
+  return { date:normalizeDate(row[0]), startCity:row[1]||'', startState:row[2]||'', endCity:row[3]||'', endState:row[4]||'', anchor:row[5]||'', nm:row[6]||'', hours:row[7]||'', motor:row[8]||'', cost:row[9]||'', seaday:row[10]||'', notes:row[11]||'' };
 }
 function entryToRow(e) {
   return [[e.date, e.startCity, e.startState, e.endCity, e.endState, e.anchor, e.nm||'', e.hours||'', e.motor||'', e.cost||'', e.seaday||'', e.notes||'']];
